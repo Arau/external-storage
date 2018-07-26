@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"k8s.io/api/core/v1"
@@ -267,14 +266,15 @@ func (p *nfsProvisioner) createVolume(options controller.VolumeOptions) (volume,
 		return volume{}, &controller.IgnoredError{Reason: fmt.Sprintf("export limit of %v has been reached", p.maxExports)}
 	}
 
-	path := path.Join(p.exportDir, options.PVName)
+	dir := options.PVC.ObjectMeta.Labels["partition"] + "/" + options.PVName
+	path := path.Join(p.exportDir, dir)
 
-	err = p.createDirectory(options.PVName, gid)
+	err = p.createDirectory(dir, gid)
 	if err != nil {
 		return volume{}, fmt.Errorf("error creating directory for volume: %v", err)
 	}
 
-	exportBlock, exportID, err := p.createExport(options.PVName, rootSquash)
+	exportBlock, exportID, err := p.createExport(dir, rootSquash)
 	if err != nil {
 		os.RemoveAll(path)
 		return volume{}, fmt.Errorf("error creating export for volume: %v", err)

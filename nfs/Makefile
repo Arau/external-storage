@@ -13,12 +13,12 @@
 # limitations under the License.
 
 ifeq ($(REGISTRY),)
-	REGISTRY = quay.io/kubernetes_incubator/
+	REGISTRY = arau/
 endif
 ifeq ($(VERSION),)
-	VERSION = latest
+	VERSION = v2
 endif
-IMAGE = $(REGISTRY)nfs-provisioner:$(VERSION)
+IMAGE = $(REGISTRY)nfs:$(VERSION)
 MUTABLE_IMAGE = $(REGISTRY)nfs-provisioner:latest
 
 all build:
