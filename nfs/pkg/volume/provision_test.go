@@ -30,7 +30,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,9 +59,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "succeed creating volume",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-1",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-1",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
@@ -75,9 +75,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "succeed creating volume again",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-2",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-2",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
@@ -91,9 +91,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "bad parameter",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-3",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{"foo": "bar"},
+				PVName:                        "pvc-3",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{"foo": "bar"},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -108,9 +108,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "bad server",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-4",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-4",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           serviceEnv,
 			expectedServer:   "",
@@ -125,9 +125,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "dir already exists",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-1",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-1",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -142,9 +142,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "error exporting",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "FAIL_TO_EXPORT_ME",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "FAIL_TO_EXPORT_ME",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -158,9 +158,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "succeed creating volume last slot",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-3",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-3",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
@@ -174,9 +174,9 @@ func TestCreateVolume(t *testing.T) {
 			name: "max export limit exceeded",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
-				PVName:     "pvc-3",
-				PVC:        newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
-				Parameters: map[string]string{},
+				PVName:                        "pvc-3",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "",
@@ -200,7 +200,7 @@ func TestCreateVolume(t *testing.T) {
 		config:    conf,
 	}
 	maxExports := 3
-	p := newNFSProvisionerInternal(tmpDir+"/", client, false, exporter, newDummyQuotaer(), "", maxExports)
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, exporter, newDummyQuotaer(), "", maxExports, "*")
 
 	for _, test := range tests {
 		os.Setenv(test.envKey, "1.1.1.1")
@@ -344,7 +344,7 @@ func TestValidateOptions(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset()
-	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "", -1)
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "", -1, "*")
 
 	for _, test := range tests {
 		gid, rootSquash, _, err := p.validateOptions(test.options)
@@ -403,7 +403,7 @@ func evaluateExportTests(t *testing.T, output string, checker func(*nfsProvision
 	}
 	for _, test := range tests {
 		client := fake.NewSimpleClientset()
-		p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{exportMap: &exportMap{exportIDs: test.exportIDs}}, newDummyQuotaer(), "", test.maxExports)
+		p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{exportMap: &exportMap{exportIDs: test.exportIDs}}, newDummyQuotaer(), "", test.maxExports, "*")
 		ok := checker(p)
 		evaluate(t, test.name, test.expectError, nil, test.expectedResult, ok, output)
 	}
@@ -459,7 +459,7 @@ func TestCreateDirectory(t *testing.T) {
 	}
 
 	client := fake.NewSimpleClientset()
-	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "", -1)
+	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "", -1, "*")
 
 	for _, test := range tests {
 		path := p.exportDir + test.directory
@@ -589,7 +589,6 @@ func TestGetServer(t *testing.T) {
 		expectedServer string
 		expectError    bool
 	}{
-
 		{
 			name:           "valid node only",
 			objs:           []runtime.Object{},
@@ -740,7 +739,7 @@ func TestGetServer(t *testing.T) {
 		}
 
 		client := fake.NewSimpleClientset(test.objs...)
-		p := newNFSProvisionerInternal(tmpDir+"/", client, test.outOfCluster, &testExporter{}, newDummyQuotaer(), test.serverHostname, -1)
+		p := newNFSProvisionerInternal(tmpDir+"/", client, test.outOfCluster, &testExporter{}, newDummyQuotaer(), test.serverHostname, -1, "*")
 
 		server, err := p.getServer()
 
@@ -826,7 +825,7 @@ func (e *testExporter) CanExport(limit int) bool {
 	return true
 }
 
-func (e *testExporter) AddExportBlock(path string, _ bool) (string, uint16, error) {
+func (e *testExporter) AddExportBlock(path string, _ bool, _ string) (string, uint16, error) {
 	id := uint16(1)
 	for ; id <= math.MaxUint16; id++ {
 		if _, ok := e.exportIDs[id]; !ok {
