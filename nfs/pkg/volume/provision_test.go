@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -31,7 +32,7 @@ import (
 	"testing"
 
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,7 +41,13 @@ import (
 )
 
 func TestCreateVolume(t *testing.T) {
-	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
+	l := make(map[string]string)
+	l["partition"] = "partition1"
+
+	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest") // "/tmp/nfsProvisionTest834417741"
+	partitionDir := filepath.Join(tmpDir, l["partition"])
+	os.MkdirAll(partitionDir, 0777)
+
 	defer os.RemoveAll(tmpDir)
 
 	tests := []struct {
@@ -55,17 +62,17 @@ func TestCreateVolume(t *testing.T) {
 		expectError      bool
 		expectIgnored    bool
 	}{
-		{
+		{ // I think i need to pass a map[string]string to the new claim function in order to populate the PVC metav1.ObjectMeta.Labels value
 			name: "succeed creating volume",
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:                        "pvc-1",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil, l),
 				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
-			expectedPath:     tmpDir + "/pvc-1",
+			expectedPath:     tmpDir + "/" + l["partition"] + "/pvc-1",
 			expectedGroup:    0,
 			expectedBlock:    "\nExport_Id = 1;\n",
 			expectedExportID: 1,
@@ -76,12 +83,12 @@ func TestCreateVolume(t *testing.T) {
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:                        "pvc-2",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil, l),
 				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
-			expectedPath:     tmpDir + "/pvc-2",
+			expectedPath:     tmpDir + "/" + l["partition"] + "/pvc-2",
 			expectedGroup:    0,
 			expectedBlock:    "\nExport_Id = 2;\n",
 			expectedExportID: 2,
@@ -92,7 +99,7 @@ func TestCreateVolume(t *testing.T) {
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:                        "pvc-3",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil, l),
 				Parameters:                    map[string]string{"foo": "bar"},
 			},
 			envKey:           podIPEnv,
@@ -109,7 +116,7 @@ func TestCreateVolume(t *testing.T) {
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:                        "pvc-4",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil, l),
 				Parameters:                    map[string]string{},
 			},
 			envKey:           serviceEnv,
@@ -126,7 +133,7 @@ func TestCreateVolume(t *testing.T) {
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:                        "pvc-1",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil, l),
 				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
@@ -143,7 +150,7 @@ func TestCreateVolume(t *testing.T) {
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:                        "FAIL_TO_EXPORT_ME",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil, l),
 				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
@@ -159,15 +166,31 @@ func TestCreateVolume(t *testing.T) {
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:                        "pvc-3",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil, l),
 				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
 			expectedServer:   "1.1.1.1",
-			expectedPath:     tmpDir + "/pvc-3",
+			expectedPath:     tmpDir + "/" + l["partition"] + "/pvc-3",
 			expectedGroup:    0,
 			expectedBlock:    "\nExport_Id = 3;\n",
 			expectedExportID: 3,
+			expectError:      false,
+		},
+		{
+			name: "partition label not set",
+			options: controller.VolumeOptions{
+				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
+				PVName:                        "pvc-4",
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil, map[string]string{"foo": "bar"}),
+				Parameters:                    map[string]string{},
+			},
+			envKey:           podIPEnv,
+			expectedServer:   "1.1.1.1",
+			expectedPath:     tmpDir + "/" + l["partition"] + "/pvc-4",
+			expectedGroup:    0,
+			expectedBlock:    "\nExport_Id = 4;\n",
+			expectedExportID: 4,
 			expectError:      false,
 		},
 		{
@@ -175,7 +198,7 @@ func TestCreateVolume(t *testing.T) {
 			options: controller.VolumeOptions{
 				PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 				PVName:                        "pvc-3",
-				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil),
+				PVC:                           newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil, l),
 				Parameters:                    map[string]string{},
 			},
 			envKey:           podIPEnv,
@@ -199,7 +222,7 @@ func TestCreateVolume(t *testing.T) {
 		exportMap: &exportMap{exportIDs: map[uint16]bool{}},
 		config:    conf,
 	}
-	maxExports := 3
+	maxExports := 4
 	p := newNFSProvisionerInternal(tmpDir+"/", client, false, exporter, newDummyQuotaer(), "", maxExports, "*")
 
 	for _, test := range tests {
@@ -224,9 +247,14 @@ func TestCreateVolume(t *testing.T) {
 }
 
 func TestValidateOptions(t *testing.T) {
-	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
-	defer os.RemoveAll(tmpDir)
+	l := make(map[string]string)
+	l["partition"] = "partition1"
 
+	tmpDir := utiltesting.MkTmpdirOrDie("nfsProvisionTest")
+	partitionDir := filepath.Join(tmpDir, l["partition"])
+	os.MkdirAll(partitionDir, 0777)
+
+	defer os.RemoveAll(tmpDir)
 	tests := []struct {
 		name               string
 		options            controller.VolumeOptions
@@ -238,7 +266,7 @@ func TestValidateOptions(t *testing.T) {
 			name: "empty parameters",
 			options: controller.VolumeOptions{
 				Parameters: map[string]string{},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil, l),
 			},
 			expectedGid: "none",
 			expectError: false,
@@ -247,7 +275,7 @@ func TestValidateOptions(t *testing.T) {
 			name: "gid parameter value 'none'",
 			options: controller.VolumeOptions{
 				Parameters: map[string]string{"gid": "none"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil, l),
 			},
 			expectedGid: "none",
 			expectError: false,
@@ -256,7 +284,7 @@ func TestValidateOptions(t *testing.T) {
 			name: "gid parameter value id",
 			options: controller.VolumeOptions{
 				Parameters: map[string]string{"gid": "1"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil, l),
 			},
 			expectedGid: "1",
 			expectError: false,
@@ -289,7 +317,7 @@ func TestValidateOptions(t *testing.T) {
 			name: "root squash parameter value 'true'",
 			options: controller.VolumeOptions{
 				Parameters: map[string]string{"rootSquash": "true"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil, l),
 			},
 			expectedGid:        "none",
 			expectedRootSquash: true,
@@ -299,7 +327,7 @@ func TestValidateOptions(t *testing.T) {
 			name: "root squash parameter value 'false'",
 			options: controller.VolumeOptions{
 				Parameters: map[string]string{"rootSquash": "false"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil, l),
 			},
 			expectedGid:        "none",
 			expectedRootSquash: false,
@@ -309,7 +337,7 @@ func TestValidateOptions(t *testing.T) {
 			name: "bad root squash parameter value neither 'true' nor 'false'",
 			options: controller.VolumeOptions{
 				Parameters: map[string]string{"rootSquash": "asdf"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil, l),
 			},
 			expectError: true,
 		},
@@ -319,7 +347,7 @@ func TestValidateOptions(t *testing.T) {
 			name: "mount options parameter key",
 			options: controller.VolumeOptions{
 				Parameters: map[string]string{"mountOptions": "asdf"},
-				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil),
+				PVC:        newClaim(resource.MustParse("1Ki"), nil, nil, l),
 			},
 			expectedGid: "none",
 			expectError: false,
@@ -328,7 +356,7 @@ func TestValidateOptions(t *testing.T) {
 		{
 			name: "non-nil selector",
 			options: controller.VolumeOptions{
-				PVC: newClaim(resource.MustParse("1Ki"), nil, &metav1.LabelSelector{MatchLabels: nil}),
+				PVC: newClaim(resource.MustParse("1Ki"), nil, &metav1.LabelSelector{MatchLabels: nil}, l),
 			},
 			expectedGid: "",
 			expectError: true,
@@ -336,7 +364,7 @@ func TestValidateOptions(t *testing.T) {
 		{
 			name: "bad capacity",
 			options: controller.VolumeOptions{
-				PVC: newClaim(resource.MustParse("1Ei"), nil, nil),
+				PVC: newClaim(resource.MustParse("1Ei"), nil, nil, l),
 			},
 			expectedGid: "",
 			expectError: true,
@@ -347,7 +375,7 @@ func TestValidateOptions(t *testing.T) {
 	p := newNFSProvisionerInternal(tmpDir+"/", client, false, &testExporter{}, newDummyQuotaer(), "", -1, "*")
 
 	for _, test := range tests {
-		gid, rootSquash, _, err := p.validateOptions(test.options)
+		gid, rootSquash, _, _, err := p.validateOptions(test.options)
 
 		evaluate(t, test.name, test.expectError, err, test.expectedGid, gid, "gid")
 		evaluate(t, test.name, test.expectError, err, test.expectedRootSquash, rootSquash, "root squash")
@@ -355,7 +383,7 @@ func TestValidateOptions(t *testing.T) {
 }
 
 func TestShouldProvision(t *testing.T) {
-	claim := newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil)
+	claim := newClaim(resource.MustParse("1Ki"), []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}, nil, map[string]string{"partition": "partition1"})
 	evaluateExportTests(t, "ShouldProvision", func(p *nfsProvisioner) bool {
 		return p.ShouldProvision(claim)
 	})
@@ -752,9 +780,11 @@ func TestGetServer(t *testing.T) {
 	}
 }
 
-func newClaim(capacity resource.Quantity, accessmodes []v1.PersistentVolumeAccessMode, selector *metav1.LabelSelector) *v1.PersistentVolumeClaim {
+func newClaim(capacity resource.Quantity, accessmodes []v1.PersistentVolumeAccessMode, selector *metav1.LabelSelector, label map[string]string) *v1.PersistentVolumeClaim {
 	claim := &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: label,
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: accessmodes,
 			Resources: v1.ResourceRequirements{
