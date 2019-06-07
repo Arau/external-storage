@@ -31,8 +31,8 @@ See https://kubernetes.io/.
 * Create a Ceph admin secret
 
 ```bash
-ceph auth get client.admin 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/secret
-kubectl create secret generic ceph-admin-secret --from-file=/tmp/secret --namespace=kube-system
+ceph auth get client.admin 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/key
+kubectl create secret generic ceph-admin-secret --from-file=/tmp/key --namespace=kube-system --type=kubernetes.io/rbd
 ```
 
 * Create a Ceph pool and a user secret
@@ -40,8 +40,8 @@ kubectl create secret generic ceph-admin-secret --from-file=/tmp/secret --namesp
 ```bash
 ceph osd pool create kube 8 8
 ceph auth add client.kube mon 'allow r' osd 'allow rwx pool=kube'
-ceph auth get client.kube 2>&1 |grep "key = " |awk '{print  $3'} |xargs echo -n > /tmp/secret
-kubectl create secret generic ceph-secret --from-file=/tmp/secret --namespace=kube-system
+ceph auth get-key client.kube > /tmp/key
+kubectl create secret generic ceph-secret --from-file=/tmp/key --namespace=kube-system --type=kubernetes.io/rbd
 ```
 
 * Start RBD provisioner
@@ -49,7 +49,7 @@ kubectl create secret generic ceph-secret --from-file=/tmp/secret --namespace=ku
 The following example uses `rbd-provisioner-1` as the identity for the instance and assumes kubeconfig is at `/root/.kube`. The identity should remain the same if the provisioner restarts. If there are multiple provisioners, each should have a different identity.
 
 ```bash
-docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host rbd-provisioner /usr/local/bin/rbd-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=rbd-provisioner-1
+docker run -ti -v /root/.kube:/kube -v /var/run/kubernetes:/var/run/kubernetes --privileged --net=host quay.io/external_storage/rbd-provisioner /usr/local/bin/rbd-provisioner -master=http://127.0.0.1:8080 -kubeconfig=/kube/config -id=rbd-provisioner-1
 ```
 
 Alternatively, deploy it in kubernetes, see [deployment](deploy/README.md).

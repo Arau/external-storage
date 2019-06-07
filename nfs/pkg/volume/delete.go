@@ -22,8 +22,8 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	"k8s.io/api/core/v1"
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
+	v1 "k8s.io/api/core/v1"
 )
 
 // Delete removes the directory that was created by Provision backing the given

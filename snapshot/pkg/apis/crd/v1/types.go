@@ -78,7 +78,7 @@ type VolumeSnapshotCondition struct {
 // +genclient=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// VolumeSnapshot is the volume snapshot object accessible to the user. Upon succesful creation of the actual
+// VolumeSnapshot is the volume snapshot object accessible to the user. Upon successful creation of the actual
 // snapshot by the volume provider it is bound to the corresponding VolumeSnapshotData through
 // the VolumeSnapshotSpec
 type VolumeSnapshot struct {
@@ -120,7 +120,7 @@ type VolumeSnapshotDataStatus struct {
 	// +optional
 	CreationTimestamp metav1.Time `json:"creationTimestamp" protobuf:"bytes,1,opt,name=creationTimestamp"`
 
-	// Representes the lates available observations about the volume snapshot
+	// Represents the lates available observations about the volume snapshot
 	Conditions []VolumeSnapshotDataCondition `json:"conditions" protobuf:"bytes,2,rep,name=conditions"`
 }
 
@@ -214,6 +214,10 @@ type GlusterVolumeSnapshotSource struct {
 type AWSElasticBlockStoreVolumeSnapshotSource struct {
 	// Unique id of the persistent disk snapshot resource. Used to identify the disk snapshot in AWS
 	SnapshotID string `json:"snapshotId"`
+	// Original volume file system type. The volume created from the snapshot would be pre-formatted
+	// using the same file system, so it has to be saved along with the AWS snapshot ID
+	// +optional
+	FSType string `json:"fsType"`
 }
 
 // CinderVolumeSnapshotSource is Cinder volume snapshot source
