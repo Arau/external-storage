@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-
 	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	v1 "k8s.io/api/core/v1"
