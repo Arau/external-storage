@@ -386,7 +386,7 @@ func (p *nfsProvisioner) validateOptions(options controller.VolumeOptions) (stri
 		}
 
 		if mostAvailableSpace == 0 {
-			return "", false, "", "", fmt.Errorf("insufficient available space to satisfy claim for %v bytes under any partition", requestBytes)
+			return "", false, "", "", fmt.Errorf("Insufficient available space to satisfy claim for %v bytes under any partition", requestBytes)
 		}
 
 		if found == false {
