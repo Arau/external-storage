@@ -22,7 +22,6 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	crdv1 "github.com/kubernetes-incubator/external-storage/snapshot/pkg/apis/crd/v1"
 	crdclient "github.com/kubernetes-incubator/external-storage/snapshot/pkg/client"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/cloudprovider"
@@ -35,6 +34,7 @@ import (
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/gcepd"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/gluster"
 	"github.com/kubernetes-incubator/external-storage/snapshot/pkg/volume/hostpath"
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -226,7 +226,10 @@ func main() {
 	}
 
 	// build volume plugins map
-	buildVolumePlugins()
+	err = buildVolumePlugins()
+	if err != nil {
+		glog.Fatalf("Error initializing volume plugins: %v", err)
+	}
 
 	// make a crd client to list VolumeSnapshot
 	snapshotClient, _, err := crdclient.NewClient(config)
@@ -250,7 +253,7 @@ func main() {
 	pc.Run(wait.NeverStop)
 }
 
-func buildVolumePlugins() {
+func buildVolumePlugins() error {
 	if len(*cloudProvider) != 0 {
 		cloud, err := cloudprovider.InitCloudProvider(*cloudProvider, *cloudConfigFile)
 		if err == nil && cloud != nil {
@@ -263,19 +266,21 @@ func buildVolumePlugins() {
 				gcePlugin := gcepd.RegisterPlugin()
 				gcePlugin.Init(cloud)
 				volumePlugins[gcepd.GetPluginName()] = gcePlugin
-				glog.Info("Register cloudprovider %s", gcepd.GetPluginName())
+				glog.Infof("Register cloudprovider %s", gcepd.GetPluginName())
 			}
 			if *cloudProvider == openstack.ProviderName {
 				cinderPlugin := cinder.RegisterPlugin()
 				cinderPlugin.Init(cloud)
 				volumePlugins[cinder.GetPluginName()] = cinderPlugin
-				glog.Info("Register cloudprovider %s", cinder.GetPluginName())
+				glog.Infof("Register cloudprovider %s", cinder.GetPluginName())
 			}
 		} else {
-			glog.Warningf("failed to initialize aws cloudprovider: %v, supported cloudproviders are %#v", err, cloudprovider.CloudProviders())
+			glog.Errorf("failed to initialize aws cloudprovider: %v, supported cloudproviders are %#v", err, cloudprovider.CloudProviders())
+			return err
 		}
 	}
 	volumePlugins[gluster.GetPluginName()] = gluster.RegisterPlugin()
 	volumePlugins[hostpath.GetPluginName()] = hostpath.RegisterPlugin()
 
+	return nil
 }

@@ -21,13 +21,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -35,7 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/klog"
 )
 
 const (
@@ -63,6 +64,8 @@ type cephFSProvisioner struct {
 	secretNamespace string
 	// enable PVC quota
 	enableQuota bool
+	// cached IP address of cluster DNS service
+	dnsip string
 }
 
 func newCephFSProvisioner(client kubernetes.Interface, id string, secretNamespace string, enableQuota bool) controller.Provisioner {
@@ -122,7 +125,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	}
 	var share, user string
 	if deterministicNames {
-		share = fmt.Sprintf(options.PVC.Name)
+		share = options.PVC.Name
 		user = fmt.Sprintf("k8s.%s.%s", options.PVC.Namespace, options.PVC.Name)
 	} else {
 		// create random share name
@@ -149,10 +152,13 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 	if deterministicNames {
 		cmd.Env = append(cmd.Env, "CEPH_VOLUME_GROUP="+options.PVC.Namespace)
 	}
+	if *disableCephNamespaceIsolation {
+		cmd.Env = append(cmd.Env, "CEPH_NAMESPACE_ISOLATION_DISABLED=true")
+	}
 
 	output, cmdErr := cmd.CombinedOutput()
 	if cmdErr != nil {
-		glog.Errorf("failed to provision share %q for %q, err: %v, output: %v", share, user, cmdErr, string(output))
+		klog.Errorf("failed to provision share %q for %q, err: %v, output: %v", share, user, cmdErr, string(output))
 		return nil, cmdErr
 	}
 	// validate output
@@ -180,7 +186,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 
 	_, err = p.client.CoreV1().Secrets(nameSpace).Create(secret)
 	if err != nil {
-		glog.Errorf("Cephfs Provisioner: create volume failed, err: %v", err)
+		klog.Errorf("Cephfs Provisioner: create volume failed, err: %v", err)
 		return nil, fmt.Errorf("failed to create secret")
 	}
 
@@ -195,6 +201,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
 			AccessModes:                   options.PVC.Spec.AccessModes,
+			MountOptions:                  options.MountOptions,
 			Capacity: v1.ResourceList{
 				// Quotas are supported by the userspace client(ceph-fuse, libcephfs), or kernel client >= 4.17 but only on mimic clusters.
 				// In other cases capacity is meaningless here.
@@ -215,7 +222,7 @@ func (p *cephFSProvisioner) Provision(options controller.VolumeOptions) (*v1.Per
 		},
 	}
 
-	glog.Infof("successfully created CephFS share %+v", pv.Spec.PersistentVolumeSource.CephFS)
+	klog.Infof("successfully created CephFS share %+v", pv.Spec.PersistentVolumeSource.CephFS)
 
 	return pv, nil
 }
@@ -237,7 +244,7 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 	// delete CephFS
 	// TODO when beta is removed, have to check kube version and pick v1/beta
 	// accordingly: maybe the controller lib should offer a function for that
-	class, err := p.client.StorageV1beta1().StorageClasses().Get(helper.GetPersistentVolumeClass(volume), metav1.GetOptions{})
+	class, err := p.client.StorageV1beta1().StorageClasses().Get(util.GetPersistentVolumeClass(volume), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -255,22 +262,25 @@ func (p *cephFSProvisioner) Delete(volume *v1.PersistentVolume) error {
 		"CEPH_AUTH_ID=" + adminID,
 		"CEPH_AUTH_KEY=" + adminSecret,
 		"CEPH_VOLUME_ROOT=" + pvcRoot}
+	if *disableCephNamespaceIsolation {
+		cmd.Env = append(cmd.Env, "CEPH_NAMESPACE_ISOLATION_DISABLED=true")
+	}
 
 	output, cmdErr := cmd.CombinedOutput()
 	if cmdErr != nil {
-		glog.Errorf("failed to delete share %q for %q, err: %v, output: %v", share, user, cmdErr, string(output))
+		klog.Errorf("failed to delete share %q for %q, err: %v, output: %v", share, user, cmdErr, string(output))
 		return cmdErr
 	}
 
 	// Remove dynamic user secret
 	secretRef, err := getSecretFromCephFSPersistentVolume(volume)
 	if err != nil {
-		glog.Errorf("failed to get secret references, err: %v", err)
+		klog.Errorf("failed to get secret references, err: %v", err)
 		return err
 	}
 	err = p.client.CoreV1().Secrets(secretRef.Namespace).Delete(secretRef.Name, &metav1.DeleteOptions{})
 	if err != nil {
-		glog.Errorf("Cephfs Provisioner: delete secret failed, err: %v", err)
+		klog.Errorf("Cephfs Provisioner: delete secret failed, err: %v", err)
 		return fmt.Errorf("failed to delete secret")
 	}
 
@@ -296,10 +306,30 @@ func (p *cephFSProvisioner) parseParameters(parameters map[string]string) (strin
 		case "cluster":
 			cluster = v
 		case "monitors":
+			// Try to find DNS info in local cluster DNS so that the kubernetes
+			// host DNS config doesn't have to know about cluster DNS
+			if p.dnsip == "" {
+				p.dnsip = util.FindDNSIP(p.client)
+			}
+			klog.V(4).Infof("dnsip: %q\n", p.dnsip)
 			arr := strings.Split(v, ",")
 			for _, m := range arr {
-				mon = append(mon, m)
+				mhost, mport := util.SplitHostPort(m)
+				if p.dnsip != "" && net.ParseIP(mhost) == nil {
+					var lookup []string
+					if lookup, err = util.LookupHost(mhost, p.dnsip); err == nil {
+						for _, a := range lookup {
+							klog.V(1).Infof("adding %+v from mon lookup\n", a)
+							mon = append(mon, util.JoinHostPort(a, mport))
+						}
+					} else {
+						mon = append(mon, util.JoinHostPort(mhost, mport))
+					}
+				} else {
+					mon = append(mon, util.JoinHostPort(mhost, mport))
+				}
 			}
+			klog.V(4).Infof("final monitors list: %v\n", mon)
 		case "adminid":
 			adminID = v
 		case "adminsecretname":
@@ -345,15 +375,17 @@ func (p *cephFSProvisioner) parsePVSecret(namespace, secretName string) (string,
 }
 
 var (
-	master          = flag.String("master", "", "Master URL")
-	kubeconfig      = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
-	id              = flag.String("id", "", "Unique provisioner identity")
-	secretNamespace = flag.String("secret-namespace", "", "Namespace secrets will be created in (default: '', created in each PVC's namespace)")
-	enableQuota     = flag.Bool("enable-quota", false, "Enable PVC quota")
-	metricsPort     = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
+	master                        = flag.String("master", "", "Master URL")
+	kubeconfig                    = flag.String("kubeconfig", "", "Absolute path to the kubeconfig")
+	id                            = flag.String("id", "", "Unique provisioner identity")
+	secretNamespace               = flag.String("secret-namespace", "", "Namespace secrets will be created in (default: '', created in each PVC's namespace)")
+	enableQuota                   = flag.Bool("enable-quota", false, "Enable PVC quota")
+	metricsPort                   = flag.Int("metrics-port", 0, "The port of the metrics server (set to non-zero to enable)")
+	disableCephNamespaceIsolation = flag.Bool("disable-ceph-namespace-isolation", false, "Disable ceph namespace isolation")
 )
 
 func main() {
+	klog.InitFlags(nil)
 	flag.Parse()
 	flag.Set("logtostderr", "true")
 
@@ -365,11 +397,11 @@ func main() {
 		config, err = rest.InClusterConfig()
 	}
 	if err != nil {
-		glog.Fatalf("Failed to create config: %v", err)
+		klog.Fatalf("Failed to create config: %v", err)
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("Failed to create client: %v", err)
+		klog.Fatalf("Failed to create client: %v", err)
 	}
 
 	prName := provisionerName
@@ -395,12 +427,12 @@ func main() {
 	// provisioners aren't officially supported until 1.5
 	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
-		glog.Fatalf("Error getting server version: %v", err)
+		klog.Fatalf("Error getting server version: %v", err)
 	}
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	glog.Infof("Creating CephFS provisioner %s with identity: %s, secret namespace: %s", prName, prID, *secretNamespace)
+	klog.Infof("Creating CephFS provisioner %s with identity: %s, secret namespace: %s", prName, prID, *secretNamespace)
 	cephFSProvisioner := newCephFSProvisioner(clientset, prID, *secretNamespace, *enableQuota)
 
 	// Start the provision controller which will dynamically provision cephFS

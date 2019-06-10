@@ -17,13 +17,15 @@ limitations under the License.
 package volume
 
 import (
-	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/controller"
+	"github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/util"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/utils/exec"
+	"strconv"
 )
 
 const (
@@ -109,14 +111,22 @@ func (p *flexProvisioner) createVolume(volumeOptions controller.VolumeOptions) e
 	extraOptions := map[string]string{}
 	extraOptions[optionPVorVolumeName] = volumeOptions.PVName
 
+	capacity := volumeOptions.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	requestBytes := capacity.Value()
+	requestMiB := int(util.RoundUpSize(requestBytes, 1024*1024))
+	requestGiB := int(util.RoundUpSize(requestBytes, 1024*1024*1024))
+	extraOptions["requestBytes"] = strconv.FormatInt(requestBytes, 10)
+	extraOptions["requestMiB"] = strconv.Itoa(requestMiB)
+	extraOptions["requestGiB"] = strconv.Itoa(requestGiB)
+
 	call := p.NewDriverCall(p.execCommand, provisionCmd)
 	call.AppendSpec(volumeOptions.Parameters, extraOptions)
 	output, err := call.Run()
 	if err != nil {
 		if output == nil || output.Message == "" {
-			glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, "<missing>", err.Error())
+			klog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, "<missing>", err.Error())
 		} else {
-			glog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, output.Message, err.Error())
+			klog.Errorf("Failed to create volume %s, output: %s, error: %s", volumeOptions, output.Message, err.Error())
 		}
 		return err
 	}
