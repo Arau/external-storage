@@ -48,9 +48,9 @@ var (
 
 const (
 	exportDir     = "/export"
-	ganeshaLog    = "/export/ganesha.log"
+	ganeshaLog    = "/export/ganesha/ganesha.log"
 	ganeshaPid    = "/var/run/ganesha.pid"
-	ganeshaConfig = "/export/vfs.conf"
+	ganeshaConfig = "/export/ganesha/vfs.conf"
 )
 
 func main() {
